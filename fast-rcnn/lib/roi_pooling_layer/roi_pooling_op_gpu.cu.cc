@@ -4,10 +4,11 @@
 
 #include <stdio.h>
 #include <cfloat>
+#include "roi_pooling_op_gpu.h"
 
-#include "tensorflow/core/framework/register_types.h"
-#include "tensorflow/core/user_ops/roi_pooling_op_gpu.h"
-#include "tensorflow/core/util/cuda_kernel_helper.h"
+#define CUDA_1D_KERNEL_LOOP(i, n)                            \
+  for (int i = blockIdx.x * blockDim.x + threadIdx.x; i < n; \
+       i += blockDim.x * gridDim.x)
 
 using std::max;
 using std::min;
