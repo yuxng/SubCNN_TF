@@ -1,5 +1,6 @@
 import tensorflow as tf
 from tensorflow.python.framework import ops
+import roi_pooling_op
 
 @tf.RegisterShape("RoiPool")
 def _roi_pool_shape(op):
@@ -35,10 +36,7 @@ def _roi_pool_grad(op, grad, _):
   pooled_width = op.get_attr('pooled_width')
   spatial_scale = op.get_attr('spatial_scale')
 
-  # load module
-  module = tf.load_op_library('/capri5/Projects/tensorflow/bazel-bin/tensorflow/core/user_ops/roi_pooling.so')
-
   # compute gradient
-  data_grad = module.roi_pool_grad(data, rois, argmax, grad, pooled_height, pooled_width, spatial_scale)
+  data_grad = roi_pooling_op.roi_pool_grad(data, rois, argmax, grad, pooled_height, pooled_width, spatial_scale)
 
   return [data_grad, None]  # List of one Tensor, since we have one input

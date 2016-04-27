@@ -1,5 +1,6 @@
 import tensorflow as tf
 import numpy as np
+import roi_pooling_op
 import roi_pooling_op_grad
 
 def weight_variable(shape):
@@ -16,9 +17,7 @@ rois = tf.convert_to_tensor([[0, 1, 1, 2, 2], [0, 3, 3, 4, 4]], dtype=tf.float32
 W = weight_variable([3, 3, 1, 1])
 h = conv2d(data, W)
 
-module = tf.load_op_library('/capri5/Projects/tensorflow/bazel-bin/tensorflow/core/user_ops/roi_pooling.so')
-print dir(module)
-[y, argmax] = module.roi_pool(h, rois, 1, 1, 1.0/1)
+[y, argmax] = roi_pooling_op.roi_pool(h, rois, 1, 1, 1.0/1)
 y_data = tf.convert_to_tensor(np.ones((2, 1, 1, 1)), dtype=tf.float32)
 print y_data, y, argmax
 
