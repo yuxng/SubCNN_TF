@@ -11,6 +11,7 @@ import caffe
 from fast_rcnn.config import cfg
 import gt_data_layer.roidb as gdl_roidb
 import roi_data_layer.roidb as rdl_roidb
+from roi_data_layer.layer import RoIDataLayer
 from utils.timer import Timer
 import numpy as np
 import os
@@ -46,66 +47,88 @@ class SolverWrapper(object):
         else:
             sess.run(tf.initialize_all_variables())
 
+        # For checkpoint
+        self.saver = tf.train.Saver()
+        self.ckpt_path = os.path.join(self.output_dir, 'model.ckpt')
 
-    def snapshot(self):
+
+    def snapshot(self, sess):
         """Take a snapshot of the network after unnormalizing the learned
         bounding-box regression weights. This enables easy use at test-time.
         """
-        net = self.solver.net
+        net = self.net
 
-        if cfg.TRAIN.BBOX_REG and net.params.has_key('bbox_pred'):
+        if cfg.TRAIN.BBOX_REG and net.layers.has_key('bbox_pred'):
             # save original values
-            orig_0 = net.params['bbox_pred'][0].data.copy()
-            orig_1 = net.params['bbox_pred'][1].data.copy()
+            with tf.variable_scope("bbox_pred", reuse=True):
+                weights = tf.get_variable("weights")
+                biases = tf.get_variable("biases")
+
+            orig_0 = tf.Variable(weights.initialized_value(), name="orig_0")
+            orig_1 = tf.Variable(biases.initialized_value(), name="orig_1")
 
             # scale and shift with bbox reg unnormalization; then save snapshot
-            net.params['bbox_pred'][0].data[...] = \
-                    (net.params['bbox_pred'][0].data *
-                     self.bbox_stds[:, np.newaxis])
-            net.params['bbox_pred'][1].data[...] = \
-                    (net.params['bbox_pred'][1].data *
-                     self.bbox_stds + self.bbox_means)
+            weights = weights * self.bbox_stds[:, np.newaxis]
+            biases = biases * self.bbox_stds + self.bbox_means
 
         if not os.path.exists(self.output_dir):
             os.makedirs(self.output_dir)
 
-        infix = ('_' + cfg.TRAIN.SNAPSHOT_INFIX
-                 if cfg.TRAIN.SNAPSHOT_INFIX != '' else '')
-        filename = (self.solver_param.snapshot_prefix + infix +
-                    '_iter_{:d}'.format(self.solver.iter) + '.caffemodel')
-        filename = os.path.join(self.output_dir, filename)
+        self.saver.save(sess, self.ckpt_path)
+        print 'Wrote snapshot to: {:s}'.format(self.ckpt_path)
 
-        net.save(str(filename))
-        print 'Wrote snapshot to: {:s}'.format(filename)
-
-        if cfg.TRAIN.BBOX_REG and net.params.has_key('bbox_pred'):
+        if cfg.TRAIN.BBOX_REG and net.layers.has_key('bbox_pred'):
             # restore net to original state
-            net.params['bbox_pred'][0].data[...] = orig_0
-            net.params['bbox_pred'][1].data[...] = orig_1
+            weights = orig_0
+            biases = orig_1
 
     def train_model(self, sess, max_iters):
         """Network training loop."""
 
         data_layer = get_data_layer(self.roidb)
 
+        # classification loss
+        prob_cls = self.net.get_output('prob_cls')
+        label = tf.placeholder(tf.float32, shape=[None, self.roidb.num_class()])
+        cross_entropy = tf.reduce_mean(-tf.reduce_sum(label * tf.log(prob_cls), reduction_indices=[1]))
+
+        # bounding box regression loss
+        bbox_pred = self.net.get_output('bbox_pred')
+        bbox_targets = tf.placeholder(tf.float32, shape=[None, 4 * self.roidb.num_class()])
+        bbox_weights = tf.placeholder(tf.float32, shape=[None, 4 * self.roidb.num_class()])
+        loss_box = tf.reduce_mean(tf.reduce_sum(tf.square(tf.mul(bbox_weights, tf.sub(bbox_pred, bbox_targets)), reduction_indices=[1]))
+
+        # multi-task loss
+        loss = tf.add(cross_entropy, loss_box)
+
+        lr = 1e-3
+        train_op = tf.train.AdamOptimizer(lr).minimize(loss)
+
         last_snapshot_iter = -1
         timer = Timer()
-        for i in range(max_iters):
+        for iter in range(max_iters):
             # get one batch
             blobs = data_layer.forward()
             # Make one SGD update
+            feed_dict={self.net.data: blobs['data'], self.net.rois: blobs['rois'], self.net.keep_prob: 0.5, \
+                       label: blobs['labels'], bbox_targets: blobs['bbox_targets'], bbox_weights: blobs['bbox_inside_weights']}
+            
             timer.tic()
-            self.solver.step(1)
+            loss_cls_value, loss_box_value, _ = sess.run([cross_entropy, loss_box, train_op], feed_dict=feed_dict)
             timer.toc()
-            if self.solver.iter % (10 * self.solver_param.display) == 0:
+
+            print 'iter: %d / %d, loss_cls: %.4f, loss_box: %.4f, lr: %f' %\
+                    (iter+1, max_iters, loss_cls_value, loss_box_value, lr)
+
+            if iter % (10 * cfg.TRAIN.DISPLAY) == 0:
                 print 'speed: {:.3f}s / iter'.format(timer.average_time)
 
-            if self.solver.iter % cfg.TRAIN.SNAPSHOT_ITERS == 0:
-                last_snapshot_iter = self.solver.iter
-                self.snapshot()
+            if iter % cfg.TRAIN.SNAPSHOT_ITERS == 0:
+                last_snapshot_iter = iter
+                self.snapshot(sess)
 
-        if last_snapshot_iter != self.solver.iter:
-            self.snapshot()
+        if last_snapshot_iter != iter:
+            self.snapshot(sess)
 
 def get_training_roidb(imdb):
     """Returns a roidb (Region of Interest database) for use in training."""

@@ -10,9 +10,9 @@
 __sets = {}
 
 import networks.caffenet
+import tensorflow as tf
 
 __sets['caffenet'] = networks.caffenet()
-
 
 def get_network(name):
     """Get a network by name."""

@@ -1,5 +1,6 @@
 import numpy as np
 import tensorflow as tf
+import roi_pooling_layer.roi_pooling_op as roi_pool_op
 
 DEFAULT_PADDING = 'SAME'
 
@@ -59,8 +60,13 @@ class Network(object):
             self.inputs.append(layer)
         return self
 
-    def get_output(self):
-        return self.inputs[-1]
+    def get_output(self, layer):
+        try:
+            layer = self.layers[layer]
+        except KeyError:
+            print self.layers.keys()
+            raise KeyError('Unknown layer name fed: %s'%layer)
+        return layer
 
     def get_unique_name(self, prefix):
         id = sum(t.startswith(prefix) for t,_ in self.layers.items())+1
@@ -114,6 +120,14 @@ class Network(object):
                               ksize=[1, k_h, k_w, 1],
                               strides=[1, s_h, s_w, 1],
                               padding=padding,
+                              name=name)
+
+    @layer
+    def roi_pool(self, input, pooled_height, pooled_width, spatial_scale, name):
+        return roi_pool_op(input[0], input[1],
+                              pooled_height,
+                              pooled_width,
+                              spatial_scale,
                               name=name)
 
     @layer

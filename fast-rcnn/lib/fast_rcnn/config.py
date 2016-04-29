@@ -108,6 +108,8 @@ __C.TRAIN.VIEWPOINT = False
 # Threshold of ROIs in training RCNN
 __C.TRAIN.ROI_THRESHOLD = 0.1
 
+__C.TRAIN.DISPLAY = 20
+
 
 # IOU >= thresh: positive example
 __C.TRAIN.RPN_POSITIVE_OVERLAP = 0.7
