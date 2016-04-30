@@ -12,7 +12,6 @@ import argparse
 from utils.timer import Timer
 import numpy as np
 import cv2
-import caffe
 from utils.cython_nms import nms, nms_new
 from utils.boxes_grid import get_boxes_grid
 import cPickle

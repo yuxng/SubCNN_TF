@@ -7,7 +7,6 @@
 
 """Train a Fast R-CNN network."""
 
-import caffe
 from fast_rcnn.config import cfg
 import gt_data_layer.roidb as gdl_roidb
 import roi_data_layer.roidb as rdl_roidb
@@ -16,9 +15,6 @@ from utils.timer import Timer
 import numpy as np
 import os
 import tensorflow as tf
-
-from caffe.proto import caffe_pb2
-import google.protobuf as pb2
 
 class SolverWrapper(object):
     """A simple wrapper around Caffe's solver.
@@ -96,7 +92,7 @@ class SolverWrapper(object):
         bbox_pred = self.net.get_output('bbox_pred')
         bbox_targets = tf.placeholder(tf.float32, shape=[None, 4 * self.roidb.num_class()])
         bbox_weights = tf.placeholder(tf.float32, shape=[None, 4 * self.roidb.num_class()])
-        loss_box = tf.reduce_mean(tf.reduce_sum(tf.square(tf.mul(bbox_weights, tf.sub(bbox_pred, bbox_targets)), reduction_indices=[1]))
+        loss_box = tf.reduce_mean(tf.reduce_sum(tf.square(tf.mul(bbox_weights, tf.sub(bbox_pred, bbox_targets))), reduction_indices=[1]))
 
         # multi-task loss
         loss = tf.add(cross_entropy, loss_box)

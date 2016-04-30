@@ -1,4 +1,5 @@
-from caffe_tf import Network
+import tensorflow as tf
+from networks.network import Network
 
 class caffenet(Network):
     def __init__(self, trainable=True):
