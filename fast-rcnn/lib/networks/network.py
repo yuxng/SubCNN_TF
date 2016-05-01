@@ -1,6 +1,7 @@
 import numpy as np
 import tensorflow as tf
 import roi_pooling_layer.roi_pooling_op as roi_pool_op
+import roi_pooling_layer.roi_pooling_op_grad
 
 DEFAULT_PADDING = 'SAME'
 
@@ -54,6 +55,7 @@ class Network(object):
             if isinstance(layer, basestring):
                 try:
                     layer = self.layers[layer]
+                    print layer
                 except KeyError:
                     print self.layers.keys()
                     raise KeyError('Unknown layer name fed: %s'%layer)
@@ -96,9 +98,9 @@ class Network(object):
                 output_groups = [convolve(i, k) for i,k in zip(input_groups, kernel_groups)]
                 conv = tf.concat(3, output_groups)
             if relu:
-                bias = tf.reshape(tf.nn.bias_add(conv, biases), conv.get_shape().as_list())
+                bias = tf.nn.bias_add(conv, biases)
                 return tf.nn.relu(bias, name=scope.name)
-            return tf.reshape(tf.nn.bias_add(conv, biases), conv.get_shape().as_list(), name=scope.name)
+            return tf.nn.bias_add(conv, biases, name=scope.name)
 
     @layer
     def relu(self, input, name):
@@ -124,7 +126,8 @@ class Network(object):
 
     @layer
     def roi_pool(self, input, pooled_height, pooled_width, spatial_scale, name):
-        return roi_pool_op(input[0], input[1],
+        print input
+        return roi_pool_op.roi_pool(input[0], input[1],
                               pooled_height,
                               pooled_width,
                               spatial_scale,
@@ -146,12 +149,17 @@ class Network(object):
     @layer
     def fc(self, input, num_out, name, relu=True):
         with tf.variable_scope(name) as scope:
+            # only use the first input
+            if isinstance(input, tuple):
+                input = input[0]
+
             input_shape = input.get_shape()
-            if input_shape.ndims==4:
+            print input_shape
+            if input_shape.ndims == 4:
                 dim = 1
                 for d in input_shape[1:].as_list():
                     dim *= d
-                feed_in = tf.reshape(input, [int(input_shape[0]), dim])
+                feed_in = tf.reshape(input, [-1, dim])
             else:
                 feed_in, dim = (input, int(input_shape[-1]))
             weights = self.make_var('weights', shape=[dim, num_out])

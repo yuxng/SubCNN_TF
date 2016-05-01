@@ -23,12 +23,12 @@ class caffenet(Network):
              .conv(3, 3, 384, 1, 1, group=2, name='conv4')
              .conv(3, 3, 256, 1, 1, group=2, name='conv5'))
 
-        (self.feed(['conv5', 'rois'])
+        (self.feed('conv5', 'rois')
              .roi_pool(6, 6, 1.0/16, name='pool5')
              .fc(4096, name='fc6')
              .fc(4096, name='fc7')
              .fc(4, relu=False, name='cls_score')
              .softmax(name='prob_cls'))
 
-        (self.feed(['fc7'])
+        (self.feed('fc7')
              .fc(16, relu=False, name='bbox_pred'))
