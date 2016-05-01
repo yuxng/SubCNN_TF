@@ -120,12 +120,13 @@ class SolverWrapper(object):
             print 'iter: %d / %d, loss_cls: %.4f, loss_box: %.4f, lr: %f' %\
                     (iter+1, max_iters, loss_cls_value, loss_box_value, lr)
 
-            sys.exit()
+            if iter == 10:
+                sys.exit()
 
-            if iter % (10 * cfg.TRAIN.DISPLAY) == 0:
+            if (iter+1) % (10 * cfg.TRAIN.DISPLAY) == 0:
                 print 'speed: {:.3f}s / iter'.format(timer.average_time)
 
-            if iter % cfg.TRAIN.SNAPSHOT_ITERS == 0:
+            if (iter+1) % cfg.TRAIN.SNAPSHOT_ITERS == 0:
                 last_snapshot_iter = iter
                 self.snapshot(sess)
 
