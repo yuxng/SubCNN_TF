@@ -22,10 +22,7 @@ def im_list_to_blob(ims):
     for i in xrange(num_images):
         im = ims[i]
         blob[i, 0:im.shape[0], 0:im.shape[1], :] = im
-    # Move channels (axis 3) to axis 1
-    # Axis order will become: (batch elem, channel, height, width)
-    channel_swap = (0, 3, 1, 2)
-    blob = blob.transpose(channel_swap)
+
     return blob
 
 def prep_im_for_blob(im, pixel_means, target_size, max_size):

@@ -26,9 +26,10 @@ class caffenet(Network):
         (self.feed('conv5', 'rois')
              .roi_pool(6, 6, 1.0/16, name='pool5')
              .fc(4096, name='fc6')
+             .dropout(self.keep_prob, name='drop6')
              .fc(4096, name='fc7')
-             .fc(4, relu=False, name='cls_score')
-             .softmax(name='prob_cls'))
+             .dropout(self.keep_prob, name='drop7')
+             .fc(4, relu=False, name='cls_score'))
 
         (self.feed('fc7')
              .fc(16, relu=False, name='bbox_pred'))

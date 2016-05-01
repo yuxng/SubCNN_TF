@@ -40,6 +40,7 @@ class Network(object):
         data_dict = np.load(data_path).item()
         for key in data_dict:
             with tf.variable_scope(key, reuse=True):
+                print key
                 for subkey, data in zip(('weights', 'biases'), data_dict[key]):
                     try:
                         var = tf.get_variable(subkey)
@@ -74,8 +75,8 @@ class Network(object):
         id = sum(t.startswith(prefix) for t,_ in self.layers.items())+1
         return '%s_%d'%(prefix, id)
 
-    def make_var(self, name, shape):
-        return tf.get_variable(name, shape, trainable=self.trainable)
+    def make_var(self, name, shape, initializer=None):
+        return tf.get_variable(name, shape, initializer=initializer, trainable=self.trainable)
 
     def validate_padding(self, padding):
         assert padding in ('SAME', 'VALID')
@@ -89,7 +90,7 @@ class Network(object):
         convolve = lambda i, k: tf.nn.conv2d(i, k, [1, s_h, s_w, 1], padding=padding)
         with tf.variable_scope(name) as scope:
             kernel = self.make_var('weights', shape=[k_h, k_w, c_i/group, c_o])
-            biases = self.make_var('biases', [c_o])
+            biases = self.make_var('biases', shape=[c_o])
             if group==1:
                 conv = convolve(input, kernel)
             else:
@@ -162,8 +163,11 @@ class Network(object):
                 feed_in = tf.reshape(input, [-1, dim])
             else:
                 feed_in, dim = (input, int(input_shape[-1]))
-            weights = self.make_var('weights', shape=[dim, num_out])
-            biases = self.make_var('biases', [num_out])
+
+            init_weights = tf.truncated_normal_initializer(0.0, stddev=0.01)
+            init_biases = tf.constant_initializer(0.0)
+            weights = self.make_var('weights', shape=[dim, num_out], initializer=init_weights)
+            biases = self.make_var('biases', shape=[num_out], initializer=init_biases)
             op = tf.nn.relu_layer if relu else tf.nn.xw_plus_b
             fc = op(feed_in, weights, biases, name=scope.name)
             return fc

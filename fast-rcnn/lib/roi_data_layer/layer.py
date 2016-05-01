@@ -17,9 +17,10 @@ import numpy as np
 class RoIDataLayer(object):
     """Fast R-CNN data layer used for training."""
 
-    def __init__(self, roidb):
+    def __init__(self, roidb, num_classes):
         """Set the roidb to be used by this layer during training."""
         self._roidb = roidb
+        self._num_classes = num_classes
         self._shuffle_roidb_inds()
 
     def _shuffle_roidb_inds(self):

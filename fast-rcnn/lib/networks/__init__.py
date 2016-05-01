@@ -6,3 +6,4 @@
 # --------------------------------------------------------
 
 from .caffenet import caffenet
+from . import factory

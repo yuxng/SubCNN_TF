@@ -93,6 +93,7 @@ def get_minibatch(roidb, num_classes):
 
         # For debug visualizations
         # _vis_minibatch(im_blob, rois_blob, labels_blob, all_overlaps, sublabels_blob, view_targets_blob, view_inside_blob)
+        # _vis_minibatch(im_blob, rois_blob, labels_blob, all_overlaps, sublabels_blob)
 
         blobs['rois'] = rois_blob
         blobs['labels'] = labels_blob
@@ -326,11 +327,11 @@ def _get_viewpoint_estimation_labels(viewpoint_data, clss, num_classes):
     return view_targets, view_loss_weights
 
 
-def _vis_minibatch(im_blob, rois_blob, labels_blob, overlaps, sublabels_blob, view_targets_blob, view_inside_blob):
+def _vis_minibatch(im_blob, rois_blob, labels_blob, overlaps, sublabels_blob, view_targets_blob=None, view_inside_blob=None):
     """Visualize a mini-batch for debugging."""
     import matplotlib.pyplot as plt
     import math
-    for i in xrange(min(rois_blob.shape[0], 1)):
+    for i in xrange(min(rois_blob.shape[0], 10)):
         rois = rois_blob[i, :]
         im_ind = rois[0]
         roi = rois[1:]
@@ -345,8 +346,8 @@ def _vis_minibatch(im_blob, rois_blob, labels_blob, overlaps, sublabels_blob, vi
 
         start = 3 * cls
         end = start + 3
-        print 'view: ', view_targets_blob[i, start:end] * 180 / math.pi
-        print 'view weights: ', view_inside_blob[i, start:end]
+        # print 'view: ', view_targets_blob[i, start:end] * 180 / math.pi
+        # print 'view weights: ', view_inside_blob[i, start:end]
 
         plt.gca().add_patch(
             plt.Rectangle((roi[0], roi[1]), roi[2] - roi[0],

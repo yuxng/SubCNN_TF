@@ -18,7 +18,7 @@ def get_network(name):
     """Get a network by name."""
     if not __sets.has_key(name):
         raise KeyError('Unknown dataset: {}'.format(name))
-    return __sets[name]()
+    return __sets[name]
 
 def list_networks():
     """List all registered imdbs."""

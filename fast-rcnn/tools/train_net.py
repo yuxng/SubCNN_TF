@@ -75,7 +75,6 @@ if __name__ == '__main__':
     imdb = get_imdb(args.imdb_name)
     print 'Loaded dataset `{:s}` for training'.format(imdb.name)
     roidb = get_training_roidb(imdb)
-    sys.exit()
 
     output_dir = get_output_dir(imdb, None)
     print 'Output will be saved to `{:s}`'.format(output_dir)
@@ -83,6 +82,6 @@ if __name__ == '__main__':
     network = get_network(args.network_name)
     print 'Use network `{:s}` in training'.format(args.network_name)
 
-    train_net(network, roidb, output_dir,
+    train_net(network, imdb, roidb, output_dir,
               pretrained_model=args.pretrained_model,
               max_iters=args.max_iters)
