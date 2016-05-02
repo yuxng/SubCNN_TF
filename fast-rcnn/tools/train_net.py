@@ -83,10 +83,9 @@ if __name__ == '__main__':
     device_name = '/gpu:{:d}'.format(args.gpu_id)
     print device_name
 
-    with tf.device(device_name):
-        network = get_network(args.network_name)
-        print 'Use network `{:s}` in training'.format(args.network_name)
+    network = get_network(args.network_name)
+    print 'Use network `{:s}` in training'.format(args.network_name)
 
-        train_net(network, imdb, roidb, output_dir,
-                  pretrained_model=args.pretrained_model,
-                  max_iters=args.max_iters)
+    train_net(network, imdb, roidb, output_dir,
+              pretrained_model=args.pretrained_model,
+              max_iters=args.max_iters)

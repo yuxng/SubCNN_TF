@@ -4,6 +4,7 @@ set -x
 set -e
 
 export PYTHONUNBUFFERED="True"
+export CUDA_VISIBLE_DEVICES=$1
 
 LOG="experiments/logs/kitti_val_caffenet_rcnn.txt.`date +'%Y-%m-%d_%H-%M-%S'`"
 exec &> >(tee -a "$LOG")
