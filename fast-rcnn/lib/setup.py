@@ -81,6 +81,7 @@ def customize_compiler_for_nvcc(self):
     # object but distutils doesn't have the ability to change compilers
     # based on source extension: we add it.
     def _compile(obj, src, ext, cc_args, extra_postargs, pp_opts):
+        print extra_postargs
         if os.path.splitext(src)[1] == '.cu':
             # use the cuda for .cu files
             self.set_executable('compiler_so', CUDA['nvcc'])
@@ -108,12 +109,12 @@ ext_modules = [
     Extension(
         "utils.cython_bbox",
         ["utils/bbox.pyx"],
-        extra_compile_args=["-Wno-cpp", "-Wno-unused-function"],
+        extra_compile_args={'gcc': ["-Wno-cpp", "-Wno-unused-function"]},
     ),
     Extension(
         "utils.cython_nms",
         ["utils/nms.pyx"],
-        extra_compile_args=["-Wno-cpp", "-Wno-unused-function"],
+        extra_compile_args={'gcc': ["-Wno-cpp", "-Wno-unused-function"]},
     ),
     Extension(
         "nms.cpu_nms",

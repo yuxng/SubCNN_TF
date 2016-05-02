@@ -47,6 +47,9 @@ __C.SUBCLS_NAME = 'voxel_exemplars'
 
 __C.TRAIN = edict()
 
+# learning rate
+__C.TRAIN.LEARNING_RATE = 0.001
+
 # Scales to compute real features
 __C.TRAIN.SCALES_BASE = (0.25, 0.5, 1.0, 2.0, 3.0)
 
@@ -93,6 +96,7 @@ __C.TRAIN.SNAPSHOT_ITERS = 10000
 
 # solver.prototxt specifies the snapshot path prefix, this adds an optional
 # infix to yield the path: <prefix>[_<infix>]_iters_XYZ.caffemodel
+__C.TRAIN.SNAPSHOT_PREFIX = 'caffenet_fast_rcnn'
 __C.TRAIN.SNAPSHOT_INFIX = ''
 
 # Use a prefetch thread in roi_data_layer.layer

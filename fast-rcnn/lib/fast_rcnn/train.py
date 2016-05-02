@@ -41,10 +41,9 @@ class SolverWrapper(object):
 
         # For checkpoint
         self.saver = tf.train.Saver()
-        self.ckpt_path = os.path.join(self.output_dir, 'model.ckpt')
 
 
-    def snapshot(self, sess):
+    def snapshot(self, sess, iter):
         """Take a snapshot of the network after unnormalizing the learned
         bounding-box regression weights. This enables easy use at test-time.
         """
@@ -52,27 +51,35 @@ class SolverWrapper(object):
 
         if cfg.TRAIN.BBOX_REG and net.layers.has_key('bbox_pred'):
             # save original values
-            with tf.variable_scope("bbox_pred", reuse=True):
+            with tf.variable_scope('bbox_pred', reuse=True):
                 weights = tf.get_variable("weights")
                 biases = tf.get_variable("biases")
 
-            orig_0 = tf.Variable(weights.initialized_value(), name="orig_0")
-            orig_1 = tf.Variable(biases.initialized_value(), name="orig_1")
+            orig_0 = weights.eval()
+            orig_1 = biases.eval()
 
             # scale and shift with bbox reg unnormalization; then save snapshot
-            weights = weights * self.bbox_stds[:, np.newaxis]
-            biases = biases * self.bbox_stds + self.bbox_means
+            weights_shape = weights.get_shape().as_list()
+            sess.run(weights.assign(orig_0 * np.tile(self.bbox_stds, (weights_shape[0],1))))
+            sess.run(biases.assign(orig_1 * self.bbox_stds + self.bbox_means))
 
         if not os.path.exists(self.output_dir):
             os.makedirs(self.output_dir)
 
-        self.saver.save(sess, self.ckpt_path)
-        print 'Wrote snapshot to: {:s}'.format(self.ckpt_path)
+        infix = ('_' + cfg.TRAIN.SNAPSHOT_INFIX
+                 if cfg.TRAIN.SNAPSHOT_INFIX != '' else '')
+        filename = (cfg.TRAIN.SNAPSHOT_PREFIX + infix +
+                    '_iter_{:d}'.format(iter+1) + '.ckpt')
+        filename = os.path.join(self.output_dir, filename)
+
+        self.saver.save(sess, filename)
+        print 'Wrote snapshot to: {:s}'.format(filename)
 
         if cfg.TRAIN.BBOX_REG and net.layers.has_key('bbox_pred'):
             # restore net to original state
-            weights = orig_0
-            biases = orig_1
+            sess.run(weights.assign(orig_0))
+            sess.run(biases.assign(orig_1))
+
 
     def train_model(self, sess, max_iters):
         """Network training loop."""
@@ -84,16 +91,16 @@ class SolverWrapper(object):
         label = tf.placeholder(tf.int32, shape=[None])
         cross_entropy = tf.reduce_mean(tf.nn.sparse_softmax_cross_entropy_with_logits(cls_score, label))
 
-        # bounding box regression L2 loss
+        # bounding box regression L1 loss
         bbox_pred = self.net.get_output('bbox_pred')
         bbox_targets = tf.placeholder(tf.float32, shape=[None, 4 * self.imdb.num_classes])
         bbox_weights = tf.placeholder(tf.float32, shape=[None, 4 * self.imdb.num_classes])
-        loss_box = tf.reduce_mean(tf.reduce_sum(tf.mul(bbox_weights, tf.square(tf.sub(bbox_pred, bbox_targets))), reduction_indices=[1]))
+        loss_box = tf.reduce_mean(tf.reduce_sum(tf.mul(bbox_weights, tf.abs(tf.sub(bbox_pred, bbox_targets))), reduction_indices=[1]))
 
         # multi-task loss
         loss = tf.add(cross_entropy, loss_box)
 
-        lr = 1e-3
+        lr = cfg.TRAIN.LEARNING_RATE
         train_op = tf.train.AdamOptimizer(lr).minimize(loss)
 
         # intialize variables
@@ -120,18 +127,15 @@ class SolverWrapper(object):
             print 'iter: %d / %d, loss_cls: %.4f, loss_box: %.4f, lr: %f' %\
                     (iter+1, max_iters, loss_cls_value, loss_box_value, lr)
 
-            if iter == 10:
-                sys.exit()
-
             if (iter+1) % (10 * cfg.TRAIN.DISPLAY) == 0:
                 print 'speed: {:.3f}s / iter'.format(timer.average_time)
 
             if (iter+1) % cfg.TRAIN.SNAPSHOT_ITERS == 0:
                 last_snapshot_iter = iter
-                self.snapshot(sess)
+                self.snapshot(sess, iter)
 
         if last_snapshot_iter != iter:
-            self.snapshot(sess)
+            self.snapshot(sess, iter)
 
 def get_training_roidb(imdb):
     """Returns a roidb (Region of Interest database) for use in training."""
@@ -169,7 +173,7 @@ def get_data_layer(roidb, num_classes):
 def train_net(network, imdb, roidb, output_dir, pretrained_model=None, max_iters=40000):
     """Train a Fast R-CNN network."""
 
-    with tf.Session() as sess:
+    with tf.Session(config=tf.ConfigProto(allow_soft_placement=True)) as sess:
         sw = SolverWrapper(sess, network, imdb, roidb, output_dir, pretrained_model=pretrained_model)
 
         print 'Solving...'

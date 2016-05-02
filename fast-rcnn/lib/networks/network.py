@@ -75,22 +75,24 @@ class Network(object):
         id = sum(t.startswith(prefix) for t,_ in self.layers.items())+1
         return '%s_%d'%(prefix, id)
 
-    def make_var(self, name, shape, initializer=None):
-        return tf.get_variable(name, shape, initializer=initializer, trainable=self.trainable)
+    def make_var(self, name, shape, initializer=None, trainable=True):
+        return tf.get_variable(name, shape, initializer=initializer, trainable=trainable)
 
     def validate_padding(self, padding):
         assert padding in ('SAME', 'VALID')
 
     @layer
-    def conv(self, input, k_h, k_w, c_o, s_h, s_w, name, relu=True, padding=DEFAULT_PADDING, group=1):
+    def conv(self, input, k_h, k_w, c_o, s_h, s_w, name, relu=True, padding=DEFAULT_PADDING, group=1, trainable=True):
         self.validate_padding(padding)
         c_i = input.get_shape()[-1]
         assert c_i%group==0
         assert c_o%group==0
         convolve = lambda i, k: tf.nn.conv2d(i, k, [1, s_h, s_w, 1], padding=padding)
         with tf.variable_scope(name) as scope:
-            kernel = self.make_var('weights', shape=[k_h, k_w, c_i/group, c_o])
-            biases = self.make_var('biases', shape=[c_o])
+            init_weights = tf.truncated_normal_initializer(0.0, stddev=0.01)
+            init_biases = tf.constant_initializer(0.0)
+            kernel = self.make_var('weights', [k_h, k_w, c_i/group, c_o], init_weights, trainable)
+            biases = self.make_var('biases', [c_o], init_biases, trainable)
             if group==1:
                 conv = convolve(input, kernel)
             else:
@@ -148,7 +150,7 @@ class Network(object):
         return tf.concat(concat_dim=axis, values=inputs, name=name)
 
     @layer
-    def fc(self, input, num_out, name, relu=True):
+    def fc(self, input, num_out, name, relu=True, trainable=True):
         with tf.variable_scope(name) as scope:
             # only use the first input
             if isinstance(input, tuple):
@@ -166,8 +168,8 @@ class Network(object):
 
             init_weights = tf.truncated_normal_initializer(0.0, stddev=0.01)
             init_biases = tf.constant_initializer(0.0)
-            weights = self.make_var('weights', shape=[dim, num_out], initializer=init_weights)
-            biases = self.make_var('biases', shape=[num_out], initializer=init_biases)
+            weights = self.make_var('weights', [dim, num_out], init_weights, trainable)
+            biases = self.make_var('biases', [num_out], init_biases, trainable)
             op = tf.nn.relu_layer if relu else tf.nn.xw_plus_b
             fc = op(feed_in, weights, biases, name=scope.name)
             return fc
