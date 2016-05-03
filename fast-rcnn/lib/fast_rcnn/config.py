@@ -238,7 +238,7 @@ def get_output_dir(imdb, net):
     if net is None:
         return path
     else:
-        return osp.join(path, net.name)
+        return osp.join(path, net)
 
 def _add_more_info(is_train):
     # compute all the scales

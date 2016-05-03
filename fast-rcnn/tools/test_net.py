@@ -13,10 +13,11 @@ import _init_paths
 from fast_rcnn.test import test_net, test_rpn_msr_net
 from fast_rcnn.config import cfg, cfg_from_file
 from datasets.factory import get_imdb
-import caffe
+from networks.factory import get_network
 import argparse
 import pprint
 import time, os, sys
+import tensorflow as tf
 
 def parse_args():
     """
@@ -28,7 +29,7 @@ def parse_args():
     parser.add_argument('--def', dest='prototxt',
                         help='prototxt file defining the network',
                         default=None, type=str)
-    parser.add_argument('--net', dest='caffemodel',
+    parser.add_argument('--weights', dest='model',
                         help='model to test',
                         default=None, type=str)
     parser.add_argument('--cfg', dest='cfg_file',
@@ -41,6 +42,9 @@ def parse_args():
                         default='voc_2007_test', type=str)
     parser.add_argument('--comp', dest='comp_mode', help='competition mode',
                         action='store_true')
+    parser.add_argument('--network', dest='network_name',
+                        help='name of the network',
+                        default=None, type=str)
 
     if len(sys.argv) == 1:
         parser.print_help()
@@ -61,21 +65,30 @@ if __name__ == '__main__':
     print('Using config:')
     pprint.pprint(cfg)
 
-    while not os.path.exists(args.caffemodel) and args.wait:
-        print('Waiting for {} to exist...'.format(args.caffemodel))
+    while not os.path.exists(args.model) and args.wait:
+        print('Waiting for {} to exist...'.format(args.model))
         time.sleep(10)
 
-    caffe.set_mode_gpu()
-    caffe.set_device(args.gpu_id)
-    net = caffe.Net(args.prototxt, args.caffemodel, caffe.TEST)
-    net.name = os.path.splitext(os.path.basename(args.caffemodel))[0]
+    weights_filename = os.path.splitext(os.path.basename(args.model))[0]
 
     imdb = get_imdb(args.imdb_name)
     imdb.competition_mode(args.comp_mode)
 
+    device_name = '/gpu:{:d}'.format(args.gpu_id)
+    print device_name
+
+    network = get_network(args.network_name)
+    print 'Use network `{:s}` in training'.format(args.network_name)
+
     cfg.GPU_ID = args.gpu_id
 
+    # start a session
+    saver = tf.train.Saver()
+    sess = tf.Session(config=tf.ConfigProto(allow_soft_placement=True))
+    saver.restore(sess, args.model)
+    print ('Loading model weights from {:s}').format(args.model)
+
     if cfg.IS_RPN == True and cfg.IS_MULTISCALE == False:
-        test_rpn_msr_net(net, imdb)
+        test_rpn_msr_net(sess, network, imdb, weights_filename)
     else:
-        test_net(net, imdb)
+        test_net(sess, network, imdb, weights_filename)

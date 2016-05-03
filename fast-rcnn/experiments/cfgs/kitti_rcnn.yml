@@ -20,3 +20,4 @@ TEST:
   SCALES_BASE: !!python/tuple [1.0, 2.0, 3.0, 4.0]
   NUM_PER_OCTAVE: 4
   NMS: 0.5
+  SUBCLS: False

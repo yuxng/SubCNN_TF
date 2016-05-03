@@ -18,7 +18,6 @@ import argparse
 import pprint
 import numpy as np
 import sys
-import tensorflow as tf
 
 def parse_args():
     """

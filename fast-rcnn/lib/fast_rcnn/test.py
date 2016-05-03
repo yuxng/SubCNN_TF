@@ -20,6 +20,7 @@ from utils.blob import im_list_to_blob
 import os
 import math
 from rpn_msr.generate import imdb_proposals_det
+import tensorflow as tf
 
 def _get_image_blob(im):
     """Converts an image into a network input.
@@ -168,7 +169,7 @@ def _rescale_boxes(boxes, inds, scales):
     return boxes
 
 
-def im_detect(net, im, boxes, num_classes, num_subclasses):
+def im_detect(sess, net, im, boxes, num_classes, num_subclasses):
     """Detect object classes in an image given object proposals.
     Arguments:
         net (caffe.Net): Fast R-CNN network to use
@@ -201,28 +202,27 @@ def im_detect(net, im, boxes, num_classes, num_subclasses):
         blobs['rois'] = blobs['rois'][index, :]
         boxes = boxes[index, :]
 
-    # reshape network inputs
-    net.blobs['data'].reshape(*(blobs['data'].shape))
-    net.blobs['rois'].reshape(*(blobs['rois'].shape))
-    blobs_out = net.forward(data=blobs['data'].astype(np.float32, copy=False),
-                            rois=blobs['rois'].astype(np.float32, copy=False))
+    # forward pass
+    feed_dict={net.data: blobs['data'], net.rois: blobs['rois'], net.keep_prob: 1.0}
+    cls_score, cls_prob, bbox_pred = sess.run([net.get_output('cls_score'), net.get_output('cls_prob'), net.get_output('bbox_pred')], feed_dict=feed_dict)
+
     if cfg.TEST.SVM:
         # use the raw scores before softmax under the assumption they
         # were trained as linear SVMs
-        scores = net.blobs['cls_score'].data
+        scores = cls_score
     else:
         # use softmax estimated probabilities
-        scores = blobs_out['cls_prob']
+        scores = cls_prob
 
     if cfg.TEST.SUBCLS:
-        scores_subcls = blobs_out['subcls_prob']
+        scores_subcls = subcls_prob
     else:
         # just use class scores
         scores_subcls = scores
 
     if cfg.TEST.BBOX_REG:
         # Apply bounding-box regression deltas
-        box_deltas = blobs_out['bbox_pred']
+        box_deltas = bbox_pred
         pred_boxes = _bbox_pred(boxes, box_deltas)
         pred_boxes = _clip_boxes(pred_boxes, im.shape)
     else:
@@ -231,7 +231,7 @@ def im_detect(net, im, boxes, num_classes, num_subclasses):
 
     if cfg.TEST.VIEWPOINT:
         # Apply bounding-box regression deltas
-        pred_views = blobs_out['view_pred']
+        pred_views = view_pred
     else:
         # set to zeros
         pred_views = np.zeros((boxes.shape[0], 3*num_classes))
@@ -355,7 +355,7 @@ def vis_detections(im, class_name, dets, thresh=0.1):
     im = im[:, :, (2, 1, 0)]
     plt.cla()
     plt.imshow(im)
-    for i in xrange(np.minimum(1, dets.shape[0])):
+    for i in xrange(np.minimum(10, dets.shape[0])):
         bbox = dets[i, :4]
         score = dets[i, 4]
         view = dets[i, 6:9]
@@ -399,9 +399,9 @@ def apply_nms(all_boxes, thresh):
             nms_boxes[cls_ind][im_ind] = dets[keep, :].copy()
     return nms_boxes
 
-def test_net(net, imdb):
+def test_net(sess, net, imdb, weights_filename):
 
-    output_dir = get_output_dir(imdb, net)
+    output_dir = get_output_dir(imdb, weights_filename)
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
 
@@ -472,7 +472,7 @@ def test_net(net, imdb):
             with open(filename, 'wb') as f:
                 cPickle.dump(conv5, f, cPickle.HIGHEST_PROTOCOL)
         else:
-            scores, boxes, scores_subcls, views = im_detect(net, im, roidb[i]['boxes'], imdb.num_classes, imdb.num_subclasses)
+            scores, boxes, scores_subcls, views = im_detect(sess, net, im, roidb[i]['boxes'], imdb.num_classes, imdb.num_subclasses)
         _t['im_detect'].toc()
 
         _t['misc'].tic()
@@ -551,9 +551,9 @@ def test_net(net, imdb):
         imdb.evaluate_detections_one_file(nms_dets, output_dir)
 
 
-def test_rpn_msr_net(net, imdb):
+def test_rpn_msr_net(sess, net, imdb, weights_filename):
 
-    output_dir = get_output_dir(imdb, net)
+    output_dir = get_output_dir(imdb, weights_filename)
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
 
