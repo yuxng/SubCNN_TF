@@ -204,7 +204,11 @@ def im_detect(sess, net, im, boxes, num_classes, num_subclasses):
 
     # forward pass
     feed_dict={net.data: blobs['data'], net.rois: blobs['rois'], net.keep_prob: 1.0}
-    cls_score, cls_prob, bbox_pred = sess.run([net.get_output('cls_score'), net.get_output('cls_prob'), net.get_output('bbox_pred')], feed_dict=feed_dict)
+    if cfg.TEST.SUBCLS:
+        cls_score, cls_prob, subcls_prob, bbox_pred = sess.run([net.get_output('cls_score'), net.get_output('cls_prob'), \
+            net.get_output('subcls_prob'), net.get_output('bbox_pred')], feed_dict=feed_dict)
+    else:
+        cls_score, cls_prob, bbox_pred = sess.run([net.get_output('cls_score'), net.get_output('cls_prob'), net.get_output('bbox_pred')], feed_dict=feed_dict)
 
     if cfg.TEST.SVM:
         # use the raw scores before softmax under the assumption they

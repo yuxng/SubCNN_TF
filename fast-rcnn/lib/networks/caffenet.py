@@ -29,8 +29,12 @@ class caffenet(Network):
              .dropout(self.keep_prob, name='drop6')
              .fc(4096, name='fc7')
              .dropout(self.keep_prob, name='drop7')
+             .fc(174, relu=False, name='subcls_score')
+             .softmax(name='subcls_prob'))
+
+        (self.feed('subcls_score')
              .fc(4, relu=False, name='cls_score')
              .softmax(name='cls_prob'))
 
-        (self.feed('fc7')
+        (self.feed('subcls_score')
              .fc(16, relu=False, name='bbox_pred'))

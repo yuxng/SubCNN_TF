@@ -91,6 +91,12 @@ class SolverWrapper(object):
         label = tf.placeholder(tf.int32, shape=[None])
         cross_entropy = tf.reduce_mean(tf.nn.sparse_softmax_cross_entropy_with_logits(cls_score, label))
 
+        # subcategory classification loss
+        if cfg.TRAIN.SUBCLS:
+            subcls_score = self.net.get_output('subcls_score')
+            sublabel = tf.placeholder(tf.int32, shape=[None])
+            subcls_cross_entropy = tf.reduce_mean(tf.nn.sparse_softmax_cross_entropy_with_logits(subcls_score, sublabel))
+
         # bounding box regression L1 loss
         bbox_pred = self.net.get_output('bbox_pred')
         bbox_targets = tf.placeholder(tf.float32, shape=[None, 4 * self.imdb.num_classes])
@@ -98,11 +104,14 @@ class SolverWrapper(object):
         loss_box = tf.reduce_mean(tf.reduce_sum(tf.mul(bbox_weights, tf.abs(tf.sub(bbox_pred, bbox_targets))), reduction_indices=[1]))
 
         # multi-task loss
-        loss = tf.add(cross_entropy, loss_box)
+        if cfg.TRAIN.SUBCLS:
+            loss = cross_entropy + subcls_cross_entropy + loss_box
+        else:
+            loss = cross_entropy + loss_box
 
+        # optimizer
         lr = tf.Variable(cfg.TRAIN.LEARNING_RATE, trainable=False)
         momentum = cfg.TRAIN.MOMENTUM
-        # train_op = tf.train.AdamOptimizer(lr).minimize(loss)
         train_op = tf.train.MomentumOptimizer(lr, momentum).minimize(loss)
 
         # intialize variables
@@ -125,14 +134,25 @@ class SolverWrapper(object):
             blobs = data_layer.forward()
 
             # Make one SGD update
-            feed_dict={self.net.data: blobs['data'], self.net.rois: blobs['rois'], self.net.keep_prob: 0.5, \
-                       label: blobs['labels'], bbox_targets: blobs['bbox_targets'], bbox_weights: blobs['bbox_inside_weights']}
+            if cfg.TRAIN.SUBCLS:
+                feed_dict={self.net.data: blobs['data'], self.net.rois: blobs['rois'], self.net.keep_prob: 0.5, \
+                           label: blobs['labels'], sublabel: blobs['sublabels'], bbox_targets: blobs['bbox_targets'], bbox_weights: blobs['bbox_inside_weights']}
+            else:
+                feed_dict={self.net.data: blobs['data'], self.net.rois: blobs['rois'], self.net.keep_prob: 0.5, \
+                           label: blobs['labels'], bbox_targets: blobs['bbox_targets'], bbox_weights: blobs['bbox_inside_weights']}
             
             timer.tic()
-            loss_cls_value, loss_box_value, _ = sess.run([cross_entropy, loss_box, train_op], feed_dict=feed_dict)
+            if cfg.TRAIN.SUBCLS:
+                loss_cls_value, loss_subcls_value, loss_box_value, _ = sess.run([cross_entropy, subcls_cross_entropy, loss_box, train_op], feed_dict=feed_dict)
+            else:
+                loss_cls_value, loss_box_value, _ = sess.run([cross_entropy, loss_box, train_op], feed_dict=feed_dict)
             timer.toc()
 
-            print 'iter: %d / %d, loss_cls: %.4f, loss_box: %.4f, lr: %f' %\
+            if cfg.TRAIN.SUBCLS:
+                print 'iter: %d / %d, loss_cls: %.4f, loss_subcls: %.4f, loss_box: %.4f, lr: %f' %\
+                    (iter+1, max_iters, loss_cls_value, loss_subcls_value, loss_box_value, lr.eval())
+            else:
+                print 'iter: %d / %d, loss_cls: %.4f, loss_box: %.4f, lr: %f' %\
                     (iter+1, max_iters, loss_cls_value, loss_box_value, lr.eval())
 
             if (iter+1) % (10 * cfg.TRAIN.DISPLAY) == 0:
