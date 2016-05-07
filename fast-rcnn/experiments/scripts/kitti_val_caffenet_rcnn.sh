@@ -10,11 +10,11 @@ LOG="experiments/logs/kitti_val_caffenet_rcnn.txt.`date +'%Y-%m-%d_%H-%M-%S'`"
 exec &> >(tee -a "$LOG")
 echo Logging output to "$LOG"
 
-#time ./tools/train_net.py --gpu $1 \
-#  --network caffenet \
-#  --weights data/imagenet_models/caffenet.npy \
-#  --imdb kitti_train \
-#  --cfg experiments/cfgs/kitti_rcnn.yml
+time ./tools/train_net.py --gpu $1 \
+  --network caffenet \
+  --weights data/imagenet_models/caffenet.npy \
+  --imdb kitti_train \
+  --cfg experiments/cfgs/kitti_rcnn.yml
 
 time ./tools/test_net.py --gpu $1 \
   --network caffenet \

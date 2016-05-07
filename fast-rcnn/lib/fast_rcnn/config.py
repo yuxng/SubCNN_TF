@@ -49,6 +49,9 @@ __C.TRAIN = edict()
 
 # learning rate
 __C.TRAIN.LEARNING_RATE = 0.001
+__C.TRAIN.MOMENTUM = 0.9
+__C.TRAIN.GAMMA = 0.1
+__C.TRAIN.STEPSIZE = 30000
 
 # Scales to compute real features
 __C.TRAIN.SCALES_BASE = (0.25, 0.5, 1.0, 2.0, 3.0)

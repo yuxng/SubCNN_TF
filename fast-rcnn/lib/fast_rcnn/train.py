@@ -100,8 +100,10 @@ class SolverWrapper(object):
         # multi-task loss
         loss = tf.add(cross_entropy, loss_box)
 
-        lr = cfg.TRAIN.LEARNING_RATE
-        train_op = tf.train.AdamOptimizer(lr).minimize(loss)
+        lr = tf.Variable(cfg.TRAIN.LEARNING_RATE, trainable=False)
+        momentum = cfg.TRAIN.MOMENTUM
+        # train_op = tf.train.AdamOptimizer(lr).minimize(loss)
+        train_op = tf.train.MomentumOptimizer(lr, momentum).minimize(loss)
 
         # intialize variables
         sess.run(tf.initialize_all_variables())
@@ -113,6 +115,12 @@ class SolverWrapper(object):
         last_snapshot_iter = -1
         timer = Timer()
         for iter in range(max_iters):
+            # learning rate
+            if iter >= cfg.TRAIN.STEPSIZE:
+                sess.run(tf.assign(lr, cfg.TRAIN.LEARNING_RATE * cfg.TRAIN.GAMMA))
+            else:
+                sess.run(tf.assign(lr, cfg.TRAIN.LEARNING_RATE))
+
             # get one batch
             blobs = data_layer.forward()
 
@@ -125,7 +133,7 @@ class SolverWrapper(object):
             timer.toc()
 
             print 'iter: %d / %d, loss_cls: %.4f, loss_box: %.4f, lr: %f' %\
-                    (iter+1, max_iters, loss_cls_value, loss_box_value, lr)
+                    (iter+1, max_iters, loss_cls_value, loss_box_value, lr.eval())
 
             if (iter+1) % (10 * cfg.TRAIN.DISPLAY) == 0:
                 print 'speed: {:.3f}s / iter'.format(timer.average_time)
