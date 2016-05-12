@@ -149,8 +149,8 @@ class SolverWrapper(object):
             timer.toc()
 
             if cfg.TRAIN.SUBCLS:
-                print 'iter: %d / %d, loss_cls: %.4f, loss_subcls: %.4f, loss_box: %.4f, lr: %f' %\
-                    (iter+1, max_iters, loss_cls_value, loss_subcls_value, loss_box_value, lr.eval())
+                print 'iter: %d / %d, loss_cls: %.4f, loss_subcls: %.4f, loss_box: %.4f, lr: %f, time: %f' %\
+                    (iter+1, max_iters, loss_cls_value, loss_subcls_value, loss_box_value, lr.eval(), timer.diff)
             else:
                 print 'iter: %d / %d, loss_cls: %.4f, loss_box: %.4f, lr: %f' %\
                     (iter+1, max_iters, loss_cls_value, loss_box_value, lr.eval())
