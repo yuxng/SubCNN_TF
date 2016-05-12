@@ -61,17 +61,17 @@ __global__ void FeatureExtrapolatingForward(const int nthreads, const Dtype* bot
     else
     {
       // bilinear interpolation
-      double xp = w / factor;
-      double yp = h / factor;
-      double cx[2], cy[2], ux, uy;
+      float xp = w / factor;
+      float yp = h / factor;
+      float cx[2], cy[2], ux, uy;
       int xi, yi, dx, dy, i;
       Dtype val;
       if(xp >= 0 && xp < width && yp >= 0 && yp < height)
       {
         xi = (int)floor(xp); 
         yi = (int)floor(yp);
-        ux = xp - (double)xi;
-        uy = yp - (double)yi;
+        ux = xp - (float)xi;
+        uy = yp - (float)yi;
         cx[0] = ux;
         cx[1] = 1 - ux;
         cy[0] = uy;
@@ -116,6 +116,7 @@ __global__ void FeatureExtrapolatingForward(const int nthreads, const Dtype* bot
             trace_data[n * channels_trace * height * width + (h * width + w) * channels_trace + 2 * i + 1] = 0;
           }
         }
+        top_data[index] = 0;
       }
     }
   }
@@ -182,9 +183,9 @@ __global__ void FeatureExtrapolatingBackward(const int nthreads, const Dtype* to
       if(which_base_scales[i] == index_scale_base)
       {
         int index_batch = index_image * num_scale + i;
-        double factor = rescaling_factors[i];
-        double xp = w * factor;
-        double yp = h * factor;
+        float factor = rescaling_factors[i];
+        float xp = w * factor;
+        float yp = h * factor;
         int xi = (int)floor(xp); 
         int yi = (int)floor(yp);
         
@@ -197,7 +198,7 @@ __global__ void FeatureExtrapolatingBackward(const int nthreads, const Dtype* to
               for(int j = 0; j < channels_trace / 2; j++)
               {
                 int index_trace = int(trace_data[index_batch * channels_trace * height * width + 2 * j + ((yi+dy) * width + (xi+dx)) * channels_trace]);
-                double weight_trace = trace_data[index_batch * channels_trace * height * width + (2 * j + 1) + ((yi+dy) * width + (xi+dx)) * channels_trace];
+                float weight_trace = trace_data[index_batch * channels_trace * height * width + (2 * j + 1) + ((yi+dy) * width + (xi+dx)) * channels_trace];
                 if(index_trace == n * channels * height * width + (h * width + w) * channels)
                   val += weight_trace * top_diff[index_batch * channels * height * width + ((yi+dy) * width + (xi+dx)) * channels + c];
               }

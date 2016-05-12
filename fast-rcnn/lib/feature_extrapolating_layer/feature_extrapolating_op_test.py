@@ -22,13 +22,13 @@ num_per_octave = 4
 
 [y, trace] = feature_extrapolating_op.feature_extrapolating(h, scales_base, num_scale_base, num_per_octave)
 
-y_data = tf.convert_to_tensor(np.ones((17, 100, 100, 1)), dtype=tf.float32)
-print y_data, y, trace
+#y_data = tf.convert_to_tensor(np.ones((17, 100, 100, 1)), dtype=tf.float32)
+#print y_data, y, trace
 
 # Minimize the mean squared errors.
-loss = tf.reduce_mean(tf.square(y - y_data))
-optimizer = tf.train.GradientDescentOptimizer(0.5)
-train = optimizer.minimize(loss)
+#loss = tf.reduce_mean(tf.square(y - y_data))
+#optimizer = tf.train.GradientDescentOptimizer(0.5)
+#train = optimizer.minimize(loss)
 
 init = tf.initialize_all_variables()
 
@@ -37,11 +37,13 @@ init = tf.initialize_all_variables()
 sess = tf.Session(config=tf.ConfigProto(log_device_placement=True))
 sess.run(init)
 
-for step in xrange(1):
-    sess.run(train)
-    print(step, sess.run(W))
-    print(sess.run(y))
-    print(sess.run(trace))
+#for step in xrange(1):
+#    sess.run(train)
+#    print(step, sess.run(W))
+np.set_printoptions(precision=2)
+np.set_printoptions(suppress=True)
+print(sess.run(y))
+print(sess.run(trace))
 
 #with tf.device('/gpu:0'):
 #  result = module.roi_pool(data, rois, 1, 1, 1.0/1)
