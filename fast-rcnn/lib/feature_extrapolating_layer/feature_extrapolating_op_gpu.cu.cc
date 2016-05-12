@@ -34,6 +34,7 @@ __global__ void FeatureExtrapolatingForward(const int nthreads, const Dtype* bot
 
     int index_image = n / num_scale;
     int index_scale = n % num_scale;
+
     // flag for approximation or not
     int flag = is_real_scales[index_scale];
     // which base scale to use
@@ -129,10 +130,28 @@ bool FeatureExtrapolatingForwardLaucher(
   const int kThreadsPerBlock = 1024;
   const int output_size = num_top * height * width * channels;
 
+  int* flags;
+  cudaMalloc((int**)&flags, sizeof(int)*num_scale);
+  cudaMemcpy(flags, is_real_scales, sizeof(int)*num_scale, cudaMemcpyHostToDevice);
+
+  int* mapping;
+  cudaMalloc((int**)&mapping, sizeof(int)*num_scale);
+  cudaMemcpy(mapping, which_base_scales, sizeof(int)*num_scale, cudaMemcpyHostToDevice);
+
+  float* factors;
+  cudaMalloc((float**)&factors, sizeof(float)*num_scale);
+  cudaMemcpy(factors, rescaling_factors, sizeof(float)*num_scale, cudaMemcpyHostToDevice);
+
   FeatureExtrapolatingForward<<<(output_size + kThreadsPerBlock - 1) / kThreadsPerBlock,
                        kThreadsPerBlock, 0, d.stream()>>>(
       output_size, bottom_data, num_scale_base, num_scale, channels_trace, height, width, channels, 
-      is_real_scales, which_base_scales, rescaling_factors, top_data, trace_data);
+      flags, mapping, factors, top_data, trace_data);
+
+
+  cudaFree(flags);
+  cudaFree(mapping);
+  cudaFree(factors);
+
   return d.ok();
 }
 
@@ -200,10 +219,22 @@ bool FeatureExtrapolatingBackwardLaucher(const float* top_diff, const int num_sc
   const int kThreadsPerBlock = 1024;
   const int output_size = batch_size * height * width * channels;
 
+  int* mapping;
+  cudaMalloc((int**)&mapping, sizeof(int)*num_scale);
+  cudaMemcpy(mapping, which_base_scales, sizeof(int)*num_scale, cudaMemcpyHostToDevice);
+
+  float* factors;
+  cudaMalloc((float**)&factors, sizeof(float)*num_scale);
+  cudaMemcpy(factors, rescaling_factors, sizeof(float)*num_scale, cudaMemcpyHostToDevice);
+
   FeatureExtrapolatingBackward<<<(output_size + kThreadsPerBlock - 1) / kThreadsPerBlock,
                        kThreadsPerBlock, 0, d.stream()>>>(
       output_size, top_diff, trace_data, num_scale_base, num_scale, channels_trace, height, width, channels, 
-      which_base_scales, rescaling_factors, bottom_diff);
+      mapping, factors, bottom_diff);
+
+  cudaFree(mapping);
+  cudaFree(factors);
+
   return d.ok();
 }
 

@@ -12,38 +12,35 @@ def conv2d(x, W):
 
 array = np.random.rand(5, 100, 100, 3)
 data = tf.convert_to_tensor(array, dtype=tf.float32)
-print data
 
-W = weight_variable([3, 3, 3, 3])
+W = weight_variable([3, 3, 3, 1])
 h = conv2d(data, W)
-print h
 
 scales_base = [0.25, 0.5, 1.0, 2.0, 3.0]
 num_scale_base = 5
 num_per_octave = 4
 
 [y, trace] = feature_extrapolating_op.feature_extrapolating(h, scales_base, num_scale_base, num_per_octave)
-print y
 
-#y_data = tf.convert_to_tensor(np.ones((17, 100, 100, 1)), dtype=tf.float32)
-#print y_data, y, trace
+y_data = tf.convert_to_tensor(np.ones((17, 100, 100, 1)), dtype=tf.float32)
+print y_data, y, trace
 
 # Minimize the mean squared errors.
-#loss = tf.reduce_mean(tf.square(y - y_data))
-#optimizer = tf.train.GradientDescentOptimizer(0.5)
-#train = optimizer.minimize(loss)
+loss = tf.reduce_mean(tf.square(y - y_data))
+optimizer = tf.train.GradientDescentOptimizer(0.5)
+train = optimizer.minimize(loss)
 
 init = tf.initialize_all_variables()
 
 # Launch the graph.
+
 sess = tf.Session(config=tf.ConfigProto(log_device_placement=True))
 sess.run(init)
-print(sess.run(y))
 
-#for step in xrange(10):
-#    sess.run(train)
-#    print(step, sess.run(W))
-#    print(sess.run(y))
+for step in xrange(10):
+    sess.run(train)
+    print(step, sess.run(W))
+    print(sess.run(y))
 
 #with tf.device('/gpu:0'):
 #  result = module.roi_pool(data, rois, 1, 1, 1.0/1)
