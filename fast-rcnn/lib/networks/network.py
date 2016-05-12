@@ -2,6 +2,8 @@ import numpy as np
 import tensorflow as tf
 import roi_pooling_layer.roi_pooling_op as roi_pool_op
 import roi_pooling_layer.roi_pooling_op_grad
+import feature_extrapolating_layer.feature_extrapolating_op as feature_extrapolating_op
+import feature_extrapolating_layer.feature_extrapolating_op_grad
 
 DEFAULT_PADDING = 'SAME'
 
@@ -129,11 +131,23 @@ class Network(object):
 
     @layer
     def roi_pool(self, input, pooled_height, pooled_width, spatial_scale, name):
+        # only use the first input
+        if isinstance(input[0], tuple):
+            input[0] = input[0][0]
         print input
+
         return roi_pool_op.roi_pool(input[0], input[1],
                               pooled_height,
                               pooled_width,
                               spatial_scale,
+                              name=name)
+
+    @layer
+    def feature_extrapolating(self, input, scales_base, num_scale_base, num_per_octave, name):
+        return feature_extrapolating_op.feature_extrapolating(input,
+                              scales_base,
+                              num_scale_base,
+                              num_per_octave,
                               name=name)
 
     @layer

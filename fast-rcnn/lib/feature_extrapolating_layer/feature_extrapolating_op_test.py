@@ -37,10 +37,11 @@ init = tf.initialize_all_variables()
 sess = tf.Session(config=tf.ConfigProto(log_device_placement=True))
 sess.run(init)
 
-for step in xrange(10):
+for step in xrange(1):
     sess.run(train)
     print(step, sess.run(W))
     print(sess.run(y))
+    print(sess.run(trace))
 
 #with tf.device('/gpu:0'):
 #  result = module.roi_pool(data, rois, 1, 1, 1.0/1)

@@ -21,9 +21,10 @@ class caffenet(Network):
              .lrn(2, 2e-05, 0.75, name='norm2')
              .conv(3, 3, 384, 1, 1, name='conv3')
              .conv(3, 3, 384, 1, 1, group=2, name='conv4')
-             .conv(3, 3, 256, 1, 1, group=2, name='conv5'))
+             .conv(3, 3, 256, 1, 1, group=2, name='conv5')
+             .feature_extrapolating([1.0, 2.0, 3.0, 4.0], 4, 4, name='conv5_feature'))
 
-        (self.feed('conv5', 'rois')
+        (self.feed('conv5_feature', 'rois')
              .roi_pool(6, 6, 1.0/16, name='pool5')
              .fc(4096, name='fc6')
              .dropout(self.keep_prob, name='drop6')
