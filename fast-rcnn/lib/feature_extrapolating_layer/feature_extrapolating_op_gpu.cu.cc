@@ -45,6 +45,7 @@ __global__ void FeatureExtrapolatingForward(const int nthreads, const Dtype* bot
     int index_batch = index_image * num_scale_base + index_scale_base;
     const Dtype* batch_data = bottom_data + index_batch * height * width * channels;
 
+    top_data[index] = 0;
     if(flag == 1) // no approximation
     {
       top_data[index] = batch_data[(h * width + w) * channels + c];
@@ -116,7 +117,6 @@ __global__ void FeatureExtrapolatingForward(const int nthreads, const Dtype* bot
             trace_data[n * channels_trace * height * width + (h * width + w) * channels_trace + 2 * i + 1] = 0;
           }
         }
-        top_data[index] = 0;
       }
     }
   }
