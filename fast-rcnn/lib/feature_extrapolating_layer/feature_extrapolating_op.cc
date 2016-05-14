@@ -50,6 +50,7 @@ class FeatureExtrapolatingOp : public OpKernel {
  public:
   explicit FeatureExtrapolatingOp(OpKernelConstruction* context) : OpKernel(context) {
     // Get the scales
+    scales_base_.clear();
     OP_REQUIRES_OK(context,
                    context->GetAttr("scales_base", &scales_base_));
     // Get the num_scale_base
@@ -70,6 +71,7 @@ class FeatureExtrapolatingOp : public OpKernel {
     num_scale_ = (num_scale_base_ - 1) * num_per_octave_ + 1;
 
     // compute scales
+    scales_.clear();
     for(int i = 0; i < num_scale_; i++)
     {
       int index_scale_base = i / num_per_octave_;
@@ -88,16 +90,19 @@ class FeatureExtrapolatingOp : public OpKernel {
     }
 
     // flags of real scales or approximated scales
+    is_real_scales_.clear();
     for(int i = 0; i < num_scale_; i++)
       is_real_scales_.push_back(0);
     for(int i = 0; i < num_scale_base_; i++)
       is_real_scales_[i * num_per_octave_] = 1;
 
     // scale mapping
+    which_base_scales_.clear();
     for(int i = 0; i < num_scale_; i++)
       which_base_scales_.push_back(int(roundf(float(i) / float(num_per_octave_))));
 
     // rescaling factors
+    rescaling_factors_.clear();
     for(int i = 0; i < num_scale_; i++)
     {
       int scale_base_index = which_base_scales_[i];
@@ -306,6 +311,7 @@ class FeatureExtrapolatingOp<Eigen::GpuDevice, T> : public OpKernel {
   explicit FeatureExtrapolatingOp(OpKernelConstruction* context) : OpKernel(context) {
 
     // Get the scales
+    scales_base_.clear();
     OP_REQUIRES_OK(context,
                    context->GetAttr("scales_base", &scales_base_));
     // Get the num_scale_base
@@ -326,6 +332,7 @@ class FeatureExtrapolatingOp<Eigen::GpuDevice, T> : public OpKernel {
     num_scale_ = (num_scale_base_ - 1) * num_per_octave_ + 1;
 
     // compute scales
+    scales_.clear();
     for(int i = 0; i < num_scale_; i++)
     {
       int index_scale_base = i / num_per_octave_;
@@ -343,16 +350,19 @@ class FeatureExtrapolatingOp<Eigen::GpuDevice, T> : public OpKernel {
     }
 
     // flags of real scales or approximated scales
+    is_real_scales_.clear();
     for(int i = 0; i < num_scale_; i++)
       is_real_scales_.push_back(0);
     for(int i = 0; i < num_scale_base_; i++)
       is_real_scales_[i * num_per_octave_] = 1;
 
     // scale mapping
+    which_base_scales_.clear();
     for(int i = 0; i < num_scale_; i++)
       which_base_scales_.push_back(int(roundf(float(i) / float(num_per_octave_))));
 
     // rescaling factors
+    rescaling_factors_.clear();
     for(int i = 0; i < num_scale_; i++)
     {
       int scale_base_index = which_base_scales_[i];
@@ -395,10 +405,14 @@ class FeatureExtrapolatingOp<Eigen::GpuDevice, T> : public OpKernel {
     TensorShapeUtils::MakeShape(dims, 4, &output_shape);
 
     // trace data 8 channels
+    int dims_trace[4];
     int channels_trace = 8;
-    dims[3] = channels_trace;
+    dims_trace[0] = num_top;
+    dims_trace[1] = data_height;
+    dims_trace[2] = data_width;
+    dims_trace[3] = channels_trace;
     TensorShape trace_shape;
-    TensorShapeUtils::MakeShape(dims, 4, &trace_shape);
+    TensorShapeUtils::MakeShape(dims_trace, 4, &trace_shape);
 
     FeatureExtrapolatingingKernel(context, &bottom_data, num_scale_base_, num_scale_, num_top, channels_trace, data_height,
       data_width, num_channels, is_real_scales_, which_base_scales_, rescaling_factors_, output_shape, trace_shape);
@@ -449,6 +463,7 @@ class FeatureExtrapolatingGradOp : public OpKernel {
   explicit FeatureExtrapolatingGradOp(OpKernelConstruction* context) : OpKernel(context) {
 
     // Get the scales
+    scales_base_.clear();
     OP_REQUIRES_OK(context,
                    context->GetAttr("scales_base", &scales_base_));
     // Get the num_scale_base
@@ -469,6 +484,7 @@ class FeatureExtrapolatingGradOp : public OpKernel {
     num_scale_ = (num_scale_base_ - 1) * num_per_octave_ + 1;
 
     // compute scales
+    scales_.clear();
     for(int i = 0; i < num_scale_; i++)
     {
       int index_scale_base = i / num_per_octave_;
@@ -486,16 +502,19 @@ class FeatureExtrapolatingGradOp : public OpKernel {
     }
 
     // flags of real scales or approximated scales
+    is_real_scales_.clear();
     for(int i = 0; i < num_scale_; i++)
       is_real_scales_.push_back(0);
     for(int i = 0; i < num_scale_base_; i++)
       is_real_scales_[i * num_per_octave_] = 1;
 
     // scale mapping
+    which_base_scales_.clear();
     for(int i = 0; i < num_scale_; i++)
       which_base_scales_.push_back(int(roundf(float(i) / float(num_per_octave_))));
 
     // rescaling factors
+    rescaling_factors_.clear();
     for(int i = 0; i < num_scale_; i++)
     {
       int scale_base_index = which_base_scales_[i];
