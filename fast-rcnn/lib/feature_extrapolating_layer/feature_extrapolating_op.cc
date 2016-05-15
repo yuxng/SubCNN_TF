@@ -182,6 +182,7 @@ class FeatureExtrapolatingOp : public OpKernel {
           for (int c = 0; c < num_channels; ++c)
           {
             const int index = (h * data_width + w) * num_channels + c;
+            output(n * data_height * data_width * num_channels + index) = 0;
             if(flag == 1) // no approximation
             {
               output(n * data_height * data_width * num_channels + index) = bottom_data_flat(index_batch * data_height * data_width * num_channels + index);
@@ -275,6 +276,8 @@ class FeatureExtrapolatingOp : public OpKernel {
 REGISTER_KERNEL_BUILDER(Name("FeatureExtrapolating").Device(DEVICE_CPU).TypeConstraint<float>("T"), FeatureExtrapolatingOp<CPUDevice, float>);
 REGISTER_KERNEL_BUILDER(Name("FeatureExtrapolating").Device(DEVICE_CPU).TypeConstraint<double>("T"), FeatureExtrapolatingOp<CPUDevice, double>);
 
+void copy_gpu_data(void* data_gpu, void* data_cpu, int size);
+
 bool FeatureExtrapolatingForwardLaucher(
     const float* bottom_data, const int num_scale_base, 
     const int num_scale, const int num_top, const int channels_trace, const int height, const int width, const int channels,
@@ -284,8 +287,7 @@ bool FeatureExtrapolatingForwardLaucher(
 static void FeatureExtrapolatingingKernel(
     OpKernelContext* context, const Tensor* bottom_data, const int num_scale_base, 
     const int num_scale, const int num_top, const int channels_trace, const int height, const int width, const int channels, 
-    const std::vector<int>& is_real_scales, const std::vector<int>& which_base_scales,
-    const std::vector<float>& rescaling_factors,
+    const int* is_real_scales, const int* which_base_scales, const float* rescaling_factors,
     const TensorShape& tensor_output_shape, const TensorShape& tensor_trace_shape) 
 {
   Tensor* output = nullptr;
@@ -299,7 +301,7 @@ static void FeatureExtrapolatingingKernel(
 
   FeatureExtrapolatingForwardLaucher(
     bottom_data->flat<float>().data(), num_scale_base, num_scale, num_top, channels_trace, height,
-    width, channels, is_real_scales.data(), which_base_scales.data(), rescaling_factors.data(),
+    width, channels, is_real_scales, which_base_scales, rescaling_factors,
     output->flat<float>().data(), trace->flat<float>().data(), context->eigen_device<Eigen::GpuDevice>());
 }
 
@@ -371,6 +373,24 @@ class FeatureExtrapolatingOp<Eigen::GpuDevice, T> : public OpKernel {
       rescaling_factors_.push_back(scale / scale_base);
     }
 
+    // construct the output shape
+    int dims[4];
+    dims[0] = 1;
+    dims[1] = 1;
+    dims[2] = 1;
+    dims[3] = num_scale_;
+    TensorShape output_shape;
+    TensorShapeUtils::MakeShape(dims, 4, &output_shape);
+
+    is_initialized_ = 0;
+    OP_REQUIRES_OK(context, context->allocate_persistent(DT_INT32, output_shape, &flags_, nullptr));
+    OP_REQUIRES_OK(context, context->allocate_persistent(DT_INT32, output_shape, &mapping_, nullptr));
+    OP_REQUIRES_OK(context, context->allocate_persistent(DT_FLOAT, output_shape, &factors_, nullptr));
+
+    if (!context->status().ok()) {
+      return;
+    }
+
   }
 
   void Compute(OpKernelContext* context) override 
@@ -414,8 +434,21 @@ class FeatureExtrapolatingOp<Eigen::GpuDevice, T> : public OpKernel {
     TensorShape trace_shape;
     TensorShapeUtils::MakeShape(dims_trace, 4, &trace_shape);
 
+    Tensor* tensor_flags = flags_.AccessTensor(context);
+    Tensor* tensor_mapping = mapping_.AccessTensor(context);
+    Tensor* tensor_factors = factors_.AccessTensor(context);
+
+    if(is_initialized_ == 0)
+    {
+      copy_gpu_data((void*)tensor_flags->flat<int>().data(), (void*)is_real_scales_.data(), sizeof(int)*num_scale_);
+      copy_gpu_data((void*)tensor_mapping->flat<int>().data(), (void*)which_base_scales_.data(), sizeof(int)*num_scale_);  
+      copy_gpu_data((void*)tensor_factors->flat<float>().data(), (void*)rescaling_factors_.data(), sizeof(float)*num_scale_);
+      is_initialized_ = 1;
+    }
+
     FeatureExtrapolatingingKernel(context, &bottom_data, num_scale_base_, num_scale_, num_top, channels_trace, data_height,
-      data_width, num_channels, is_real_scales_, which_base_scales_, rescaling_factors_, output_shape, trace_shape);
+      data_width, num_channels, tensor_flags->flat<int>().data(), tensor_mapping->flat<int>().data(), tensor_factors->flat<float>().data(), 
+      output_shape, trace_shape);
 
   }
  private:
@@ -427,6 +460,10 @@ class FeatureExtrapolatingOp<Eigen::GpuDevice, T> : public OpKernel {
   std::vector<int> is_real_scales_;
   std::vector<int> which_base_scales_;
   std::vector<float> rescaling_factors_;
+  PersistentTensor flags_;
+  PersistentTensor mapping_;
+  PersistentTensor factors_;
+  int is_initialized_;
 };
 
 REGISTER_KERNEL_BUILDER(Name("FeatureExtrapolating").Device(DEVICE_GPU).TypeConstraint<float>("T"), FeatureExtrapolatingOp<Eigen::GpuDevice, float>);
@@ -439,7 +476,7 @@ bool FeatureExtrapolatingBackwardLaucher(const float* top_diff, const int num_sc
 static void FeatureExtrapolatingingGradKernel(
     OpKernelContext* context, const Tensor* bottom_data, const Tensor* trace_data, const Tensor* out_backprop,
     const int num_scale_base, const int num_scale, const int channels_trace, const int batch_size, const int height, const int width, const int channels, 
-    const std::vector<int>& which_base_scales, const std::vector<float>& rescaling_factors,
+    const int* which_base_scales, const float* rescaling_factors,
     const TensorShape& tensor_output_shape) 
 {
   Tensor* output = nullptr;
@@ -451,7 +488,7 @@ static void FeatureExtrapolatingingGradKernel(
 
   FeatureExtrapolatingBackwardLaucher(
     out_backprop->flat<float>().data(), num_scale_base, num_scale, channels_trace, batch_size, height,
-    width, channels, which_base_scales.data(), rescaling_factors.data(),
+    width, channels, which_base_scales, rescaling_factors,
     output->flat<float>().data(), trace_data->flat<float>().data(), context->eigen_device<Eigen::GpuDevice>());
 }
 
@@ -522,6 +559,24 @@ class FeatureExtrapolatingGradOp : public OpKernel {
       float scale = scales_[i];
       rescaling_factors_.push_back(scale / scale_base);
     }
+
+    // construct the output shape
+    int dims[4];
+    dims[0] = 1;
+    dims[1] = 1;
+    dims[2] = 1;
+    dims[3] = num_scale_;
+    TensorShape output_shape;
+    TensorShapeUtils::MakeShape(dims, 4, &output_shape);
+
+    is_initialized_ = 0;
+    OP_REQUIRES_OK(context, context->allocate_persistent(DT_INT32, output_shape, &mapping_, nullptr));
+    OP_REQUIRES_OK(context, context->allocate_persistent(DT_FLOAT, output_shape, &factors_, nullptr));
+
+    if (!context->status().ok()) {
+      return;
+    }
+
   }
 
   void Compute(OpKernelContext* context) override 
@@ -554,9 +609,19 @@ class FeatureExtrapolatingGradOp : public OpKernel {
     // construct the output shape
     TensorShape output_shape = bottom_data.shape();
 
+    Tensor* tensor_mapping = mapping_.AccessTensor(context);
+    Tensor* tensor_factors = factors_.AccessTensor(context);
+
+    if(is_initialized_ == 0)
+    {
+      copy_gpu_data((void*)tensor_mapping->flat<int>().data(), (void*)which_base_scales_.data(), sizeof(int)*num_scale_);  
+      copy_gpu_data((void*)tensor_factors->flat<float>().data(), (void*)rescaling_factors_.data(), sizeof(float)*num_scale_);
+      is_initialized_ = 1;
+    }
+
     FeatureExtrapolatingingGradKernel(
       context, &bottom_data, &trace_data, &out_backprop, num_scale_base_, num_scale_, channels_trace, batch_size, height,
-      width, channels, which_base_scales_, rescaling_factors_, output_shape);
+      width, channels, tensor_mapping->flat<int>().data(), tensor_factors->flat<float>().data(), output_shape);
 
   }
  private:
@@ -568,6 +633,9 @@ class FeatureExtrapolatingGradOp : public OpKernel {
   std::vector<int> is_real_scales_;
   std::vector<int> which_base_scales_;
   std::vector<float> rescaling_factors_;
+  PersistentTensor mapping_;
+  PersistentTensor factors_;
+  int is_initialized_;
 };
 
 REGISTER_KERNEL_BUILDER(Name("FeatureExtrapolatingGrad").Device(DEVICE_GPU).TypeConstraint<float>("T"), FeatureExtrapolatingGradOp<Eigen::GpuDevice, float>);

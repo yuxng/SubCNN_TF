@@ -2,7 +2,6 @@
 
 #define EIGEN_USE_GPU
 
-#include <cuda_runtime.h>
 #include <stdio.h>
 #include <cfloat>
 #include "feature_extrapolating_op_gpu.h"
@@ -13,6 +12,15 @@
 
 // namespace tensorflow {
 using namespace tensorflow;
+
+void copy_gpu_data(void* data_gpu, void* data_cpu, int size)
+{
+  cudaError_t err;
+
+  err = cudaMemcpy(data_gpu, data_cpu, size, cudaMemcpyHostToDevice);
+  if (err != cudaSuccess)
+    std::cerr << "Unable to copy memory" << std::endl;
+}
 
 template <typename Dtype>
 __global__ void FeatureExtrapolatingForward(const int nthreads, const Dtype* bottom_data,
@@ -133,34 +141,10 @@ bool FeatureExtrapolatingForwardLaucher(
   const int output_size = num_top * height * width * channels;
   cudaError_t err;
 
-  int* flags;
-  err = cudaMalloc((void**)&flags, sizeof(int)*num_scale);
-  if (err != cudaSuccess)
-    std::cerr << "Unable to allocate device memory" << std::endl;
-  err = cudaMemcpy(flags, is_real_scales, sizeof(int)*num_scale, cudaMemcpyHostToDevice);
-  if (err != cudaSuccess)
-    std::cerr << "Unable to copy memory" << std::endl;
-
-  int* mapping;
-  err = cudaMalloc((void**)&mapping, sizeof(int)*num_scale);
-  if (err != cudaSuccess)
-    std::cerr << "Unable to allocate device memory" << std::endl;
-  err = cudaMemcpy(mapping, which_base_scales, sizeof(int)*num_scale, cudaMemcpyHostToDevice);
-  if (err != cudaSuccess)
-    std::cerr << "Unable to copy memory" << std::endl;
-
-  float* factors;
-  err = cudaMalloc((void**)&factors, sizeof(float)*num_scale);
-  if (err != cudaSuccess)
-    std::cerr << "Unable to allocate device memory" << std::endl;
-  err = cudaMemcpy(factors, rescaling_factors, sizeof(float)*num_scale, cudaMemcpyHostToDevice);
-  if (err != cudaSuccess)
-    std::cerr << "Unable to copy memory" << std::endl;
-
   FeatureExtrapolatingForward<<<(output_size + kThreadsPerBlock - 1) / kThreadsPerBlock,
                        kThreadsPerBlock, 0, d.stream()>>>(
       output_size, bottom_data, num_scale_base, num_scale, channels_trace, height, width, channels, 
-      flags, mapping, factors, top_data, trace_data);
+      is_real_scales, which_base_scales, rescaling_factors, top_data, trace_data);
 
   err = cudaGetLastError();
   if(cudaSuccess != err)
@@ -168,10 +152,6 @@ bool FeatureExtrapolatingForwardLaucher(
       fprintf( stderr, "cudaCheckError() failed : %s\n", cudaGetErrorString( err ) );
       exit( -1 );
   }
-
-  cudaFree(flags);
-  cudaFree(mapping);
-  cudaFree(factors);
 
   return d.ok();
 }
@@ -241,18 +221,10 @@ bool FeatureExtrapolatingBackwardLaucher(const float* top_diff, const int num_sc
   const int output_size = batch_size * height * width * channels;
   cudaError_t err;
 
-  int* mapping;
-  cudaMalloc((int**)&mapping, sizeof(int)*num_scale);
-  cudaMemcpy(mapping, which_base_scales, sizeof(int)*num_scale, cudaMemcpyHostToDevice);
-
-  float* factors;
-  cudaMalloc((float**)&factors, sizeof(float)*num_scale);
-  cudaMemcpy(factors, rescaling_factors, sizeof(float)*num_scale, cudaMemcpyHostToDevice);
-
   FeatureExtrapolatingBackward<<<(output_size + kThreadsPerBlock - 1) / kThreadsPerBlock,
                        kThreadsPerBlock, 0, d.stream()>>>(
       output_size, top_diff, trace_data, num_scale_base, num_scale, channels_trace, height, width, channels, 
-      mapping, factors, bottom_diff);
+      which_base_scales, rescaling_factors, bottom_diff);
 
   err = cudaGetLastError();
   if(cudaSuccess != err)
@@ -260,9 +232,6 @@ bool FeatureExtrapolatingBackwardLaucher(const float* top_diff, const int num_sc
     fprintf( stderr, "cudaCheckError() failed : %s\n", cudaGetErrorString( err ) );
     exit( -1 );
   }
-
-  cudaFree(mapping);
-  cudaFree(factors);
 
   return d.ok();
 }
