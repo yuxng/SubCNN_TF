@@ -3,6 +3,16 @@ echo $TF_INC
 
 CUDA_PATH=/usr/local/cuda-7.5
 
+cd localization_layer
+
+nvcc -std=c++11 -c -o localization_op.cu.o localization_op_gpu.cu.cc \
+  -I $TF_INC -D GOOGLE_CUDA=1 -x cu -Xcompiler -fPIC -arch=sm_50
+
+g++ -std=c++11 -shared -o localization.so localization_op.cc \
+  localization_op.cu.o -I $TF_INC -fPIC -lcudart -L $CUDA_PATH/lib64
+cd ..
+
+
 cd roi_pooling_layer
 
 nvcc -std=c++11 -c -o roi_pooling_op.cu.o roi_pooling_op_gpu.cu.cc \
