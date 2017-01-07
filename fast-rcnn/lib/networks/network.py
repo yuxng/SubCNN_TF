@@ -195,3 +195,7 @@ class Network(object):
     @layer
     def dropout(self, input, keep_prob, name):
         return tf.nn.dropout(input, keep_prob, name=name)
+
+    @layer
+    def localization(self, input, boxes, box_ind, crop_size, name):
+        return tf.image.crop_and_resize(input, boxes, box_ind, crop_size, name=name)
